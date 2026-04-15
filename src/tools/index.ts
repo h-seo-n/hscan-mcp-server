@@ -2,8 +2,9 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 //import * as api from "../lib/healthHubApi.ts";
 //import * as store from "../lib/sessionStore.ts";
-import type { Case } from "../lib/types.ts"; 
+import type { CasePageResponse } from "../lib/types.ts"; 
 import type {  mailingAddress } from "../lib/types.ts";
+import type { Hospital } from "../lib/types.ts";
 
 
 /** File for Tool Registration 
@@ -59,6 +60,13 @@ function filterCases(cases: Case[], input: any): Case[] {
     })
 }
 
+function filterHospitals(hospitals: Hospital[], input: any): Hospital[] {
+    return hospitals.filter((h) => {
+        const matchName = !input.name || h.name.toLowerCase().includes(input.name.toLowerCase());
+        return matchName;
+    });
+}
+
 // schema.ts
 export const mailingAddressSchema = z.object({
   postalCode: z.string(),
@@ -110,7 +118,9 @@ export function registerTools(server: McpServer): void {
             const response = await fetch("https://mano-snucse.healthhub.dev/case", {
                 method: "GET"
             });
-            const cases = await response.json() as Case[];
+            const casePageResponse = await response.json() as CasePageResponse;
+            const cases = casePageResponse.content;
+            // const { cases } = await response.json() as CasePageResponse; - alternative
             const result = filterCases(cases, (args as any).input);
             
             return {
@@ -130,7 +140,7 @@ export function registerTools(server: McpServer): void {
 
     server.tool(
         "shareImage",
-        "영상 공유",
+        "의사에게 케이스를 공유하기 위한 6자리 코드를 발급합니다.",
         {
             inputSchema: z.object({
                 caseId: z.string(),
@@ -150,53 +160,93 @@ export function registerTools(server: McpServer): void {
                 }),
             });
             const result = await response.json();
-            const pin = result.pin; 
-            // 공유 코드 json에서 받아오기. 근데 API에서 찾을 수 없었음... 일단 pin으로 가정
+            const code = result.code; 
 
             return {
                 content: [
                     {
                         type: "text",
-                        text: pin.toString().slice(0,6),
+                        text: code.toString().slice(0,6),
                     }
                 ]
             }
         }
     );
 
-    /* CD 발급 신청하면 결제 창으로 넘어가는데 결제 창으로 넘어가는 것까지만 구현해야할지? 결제 완료까지 여기서 이루어지는건지..?
-    -> 일단 결제 api 호출까지만 구현해놓음
-    수정 필요 */
-
     server.tool(
         "IssueCD",
-        "CD 발급", 
+        "CD 배송을 신청합니다.", 
         {
             inputSchema: z.object({
                 caseId: z.string(),
-                address: mailingAddressSchema,
+                address: mailingAddressSchema
             })
         },
-        async (args : {input: { caseId: string; address: mailingAddress }}) => {
-            const { caseId, address } = args.input;
-            //const { caseId, address } = (args as any).input; - alternative
+        async (args) => {
+            //const { caseId, address } = args;
+            const { caseId, address } = (args as any).input;
 
-            await fetch("https://mano-snucse.healthhub.dev/cd-delivery/payment", {
-                method: "PUT",
+            const prepareResponse = await fetch("https://mano-snucse.healthhub.dev/cd-delivery/payment", {
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ caseId, address }),
             });
+            
+            const payment = await prepareResponse.json();
+            const paymentId = payment.paymentId; // 결제 준비 응답에서 paymentId 받아오기. API 명세서에 paymentId가 있는지 확실하지 않음. 일단 가정
 
+            const confirmResponse = await fetch(`https://mano-snucse.healthhub.dev/cd-delivery/payment/{id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+                
             return {
                 content: [
                     {
                         type: "text",
-                        text: "CD 발급 신청? 완료되었습니다."
+                        text: "CD 발급 신청 완료되었습니다."
                     }
                 ]
             }
         }
-    ) 
+    );
+
+    
+
+    server.tool(
+        "searchHospital",
+        "병원 검색",
+
+         {
+            //title: "Get Image List",
+            inputSchema: z.object({
+            name: z.string().optional()            
+            }) 
+        },
+
+        async (args) => {
+            const response = await fetch("https://mano-snucse.healthhub.dev/hospital", {
+                method: "GET"
+            });
+            const hospitals = await response.json() as Hospital[];
+            const result = filterHospitals(hospitals, (args as any).input);
+            
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            total: result.length,
+                            hospitals: result,
+                        })
+                    }
+            ]
+            }
+        }
+
+    )
 }

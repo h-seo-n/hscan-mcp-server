@@ -1,3 +1,5 @@
+import { number } from "zod";
+
 /** tool 사용 내역 데이터타입 */
 export interface ToolCallEntry {
     id: string;
@@ -33,7 +35,7 @@ export interface SessionData {
  * 병원, 영상, 결과, 유저 정보... 등에 대한 필요한 데이터타입이나 인터페이스를 정의하기
  */
 
-export type Case = {
+/*export type Case = {
     caseId: string
     patientId: string
     birthDate: string
@@ -65,6 +67,129 @@ export type Case = {
     ]
     userId: string
     
+}*/
+
+type ImageId = string;
+
+interface Series {
+    seriesNumber: string | null;
+    seriesInstanceUID: string;
+    seriesDescription: string | null;
+    images: ImageId[];
+}
+
+type PatientSex = "M" | "F" | "O";
+
+
+
+interface Case {
+    caseId: string;
+    patientId: string;
+    birthDate: string;
+    patientName: string;
+    patientSex: PatientSex;
+    studyDate: string;
+    accessionNumber: string;
+    studyInstanceUID: string;
+    studyDescription: string;
+    modality: string;
+    institutionName: string;
+    imageHash: Record<string, string>;
+    bodyPart: string[];
+    series: Series[];
+    createdAt: string | null;
+    userId: string;
+    requestedDate: string;
+    acceptedDate: string;
+    locked: boolean;
+    contentIds: ImageId[];
+}
+
+interface SortInfo {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+}
+
+interface Pageable {
+    pageNumber: number;
+    pageSize: number;
+    sort: SortInfo;
+    offset: number;
+    paged: boolean;
+    unpaged: boolean;
+}
+
+interface CasePageResponse {
+    content: Case[];
+    pageable: Pageable;
+    sort: SortInfo;
+    first: boolean;
+    last: boolean;
+    totalElements: number;
+    totalPages: number;
+    size: number;
+    number: number;
+    numberOfElements: number;
+    empty: boolean;
+}
+interface PriceBase {
+    type: "SIMPLE" | "VOLUME2";
+}
+
+interface SimplePrice extends PriceBase {
+    type: "SIMPLE";
+    amount: number;
+    taxFree: number;
+}
+
+interface VolumeUnit {
+    name: string;
+    virtualVolume: number;
+    volume: number;
+    price: number;
+    taxFree: number;
+    unit: string;
+}
+
+export type ModalityKey = 
+  | "CT" | "MR" | "CR" | "DX" | "ECG" | "ES"
+  | "MG" | "NM" | "PET" | "RF" | "US" | "XA"
+  | "XC" | "PX" | "OCT" | "IVOCT" | "IVUS";
+
+interface ModalityConfig {
+    virtualSize: number;
+}
+
+interface Volume2Price extends PriceBase {
+    type: "VOLUME2";
+    units: VolumeUnit[];
+    modalities: Partial<Record<ModalityKey, ModalityConfig>>;
+    defaultOption: ModalityConfig;
+    useExpectedPrice: boolean;
+}
+
+export type HospitalPrice = SimplePrice | Volume2Price;
+
+export type Hospital = {
+    id: string
+    name: string
+    address: string | null
+    registrationNumberRequired: boolean
+    disabed: boolean
+    price: HospitalPrice
+    useMailing: true
+    mailingMandatory: true
+    loadEnabled: true
+    storeEnabled: true
+    health: {
+        code: string
+        description: string
+    }
+    onlineIssuanceMessage: string
+    hpacsHospitalId: [
+        string
+    ]
 }
 
 export type mailingAddress = {
