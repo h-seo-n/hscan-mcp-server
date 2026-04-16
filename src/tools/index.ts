@@ -1,7 +1,11 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 //import * as api from "../lib/healthHubApi.ts";
 //import * as store from "../lib/sessionStore.ts";
+import type { CasePageResponse } from "../lib/types.ts"; 
+import type {  mailingAddress } from "../lib/types.ts";
+import type { Hospital } from "../lib/types.ts";
+
 
 /** File for Tool Registration 
  * -> llms can use the tools provided by our server to execute actions.
@@ -29,6 +33,49 @@ function withLogging(
     };
 }
 
+/** input에 맞는 case filtering 함수 
+ * 병원 API가 GET/case, GET/case/{id}, 등으로 케이스 검색을 지원함. 
+ * 우선 실제로 검색에 사용할 만한 필터 4개로 filtering 함수 구현해봄. 
+ * API에서 지원하는 필터링 옵션을 완전히 이해하지 못해서 일단 임의로 골랐음. 
+ * 지원하는 필터링만 구현해도 괜찮을 듯... 
+*/
+
+function filterCases(cases: Case[], input: any): Case[] {
+    return cases.filter((c) => {
+        const matchStudyDescription =
+            !input.studyDescription ||
+            c.studyDescription.toLowerCase().includes(input.studyDescription.toLowerCase());
+        const matchInstitutionName =
+            !input.institutionName ||
+            c.institutionName.toLowerCase().includes(input.institutionName.toLowerCase());
+        const matchModality =
+            !input.modality || c.modality.toLowerCase() === input.modality.toLowerCase();
+        const matchBodyPart =
+            !input.bodyPart ||
+            c.bodyPart.some((bp) => bp.toLowerCase() === input.bodyPart.toLowerCase());
+
+        return (
+            matchStudyDescription && matchInstitutionName && matchModality && matchBodyPart
+        );
+    })
+}
+
+function filterHospitals(hospitals: Hospital[], input: any): Hospital[] {
+    return hospitals.filter((h) => {
+        const matchName = !input.name || h.name.toLowerCase().includes(input.name.toLowerCase());
+        return matchName;
+    });
+}
+
+// schema.ts
+export const mailingAddressSchema = z.object({
+  postalCode: z.string(),
+  baseAddress: z.string(),
+  detailAddress: z.string(),
+  receiverName: z.string(),
+  receiverPhone: z.string(),
+});
+
 
 /**
  * TODO : registerTools() 안에 필요한 tool들의 목록을 모두 구현해야 함.
@@ -53,4 +100,153 @@ export function registerTools(server: McpServer): void {
      * ....
      * )
      */
+    server.tool(
+        "getImageList",
+        "주어진 필터링 옵션에 맞는 케이스 목록을 반환합니다. 옵션은 studyDescription, institutionName, modality, bodyPart이 있습니다. 각 옵션은 문자열입니다.",
+        {
+            //title: "Get Image List",
+            inputSchema: z.object({
+            studyDescription: z.string().optional(),
+            institutionName: z.string().optional(),
+            modality: z.string().optional(),
+            bodyPart: z.string().optional(),
+            
+            }) 
+        },
+
+        async (args) => {
+            const response = await fetch("https://mano-snucse.healthhub.dev/case", {
+                method: "GET"
+            });
+            const casePageResponse = await response.json() as CasePageResponse;
+            const cases = casePageResponse.content;
+            // const { cases } = await response.json() as CasePageResponse; - alternative
+            const result = filterCases(cases, (args as any).input);
+            
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            total: result.length,
+                            cases: result,
+                        })
+                    }
+            ]
+            }
+        }
+        
+    );
+
+    server.tool(
+        "shareImage",
+        "의사에게 케이스를 공유하기 위한 6자리 코드를 발급합니다.",
+        {
+            inputSchema: z.object({
+                caseId: z.string(),
+            })
+        },
+
+        async (args) => {
+            const caseId = (args as any).input.caseId;
+            const response = await fetch("https://mano-snucse.healthhub.dev/share-code", {
+                method: "POST",
+                
+                headers: {
+                    "Content-Type": "application/json",
+                }, 
+                body: JSON.stringify({
+                    caseId,
+                }),
+            });
+            const result = await response.json();
+            const code = result.code; 
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: code.toString().slice(0,6),
+                    }
+                ]
+            }
+        }
+    );
+
+    server.tool(
+        "IssueCD",
+        "CD 배송을 신청합니다.", 
+        {
+            inputSchema: z.object({
+                caseId: z.string(),
+                address: mailingAddressSchema
+            })
+        },
+        async (args) => {
+            //const { caseId, address } = args;
+            const { caseId, address } = (args as any).input;
+
+            const prepareResponse = await fetch("https://mano-snucse.healthhub.dev/cd-delivery/payment", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ caseId, address }),
+            });
+            
+            const payment = await prepareResponse.json();
+            const paymentId = payment.paymentId; // 결제 준비 응답에서 paymentId 받아오기. API 명세서에 paymentId가 있는지 확실하지 않음. 일단 가정
+
+            const confirmResponse = await fetch(`https://mano-snucse.healthhub.dev/cd-delivery/payment/{id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+                
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: "CD 발급 신청 완료되었습니다."
+                    }
+                ]
+            }
+        }
+    );
+
+    
+
+    server.tool(
+        "searchHospital",
+        "병원 검색",
+
+         {
+            //title: "Get Image List",
+            inputSchema: z.object({
+            name: z.string().optional()            
+            }) 
+        },
+
+        async (args) => {
+            const response = await fetch("https://mano-snucse.healthhub.dev/hospital", {
+                method: "GET"
+            });
+            const hospitals = await response.json() as Hospital[];
+            const result = filterHospitals(hospitals, (args as any).input);
+            
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify({
+                            total: result.length,
+                            hospitals: result,
+                        })
+                    }
+            ]
+            }
+        }
+
+    )
 }
