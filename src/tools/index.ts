@@ -1,11 +1,21 @@
+import "dotenv/config";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 //import * as api from "../lib/healthHubApi.ts";
 //import * as store from "../lib/sessionStore.ts";
 import type { CasePageResponse } from "../lib/types.ts"; 
+import type { Case } from "../lib/types.ts";
 import type {  mailingAddress } from "../lib/types.ts";
 import type { Hospital } from "../lib/types.ts";
+import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 
+const SESSION = process.env.SESSION ?? "";
+const XSRF_TOKEN = process.env.XSRF_TOKEN ?? "";
+
+const authHeaders = {
+    "Cookie": `SESSION=${SESSION}; XSRF-TOKEN=${XSRF_TOKEN}`,
+    "X-Xsrf-Token": XSRF_TOKEN,
+};
 
 /** File for Tool Registration 
  * -> llms can use the tools provided by our server to execute actions.
@@ -115,13 +125,19 @@ export function registerTools(server: McpServer): void {
         },
 
         async (args) => {
-            const response = await fetch("https://mano-snucse.healthhub.dev/case", {
-                method: "GET"
+            const response = await fetch("https://snucse.hscan.kr/api/hscan/case?page=0&size=5", {
+                method: "GET",
+                headers: authHeaders,
             });
+            
+            /* API 응답 확인용 로그 
+            const rawText = await response.text();
+            console.error("API 응답:", rawText); */
+
             const casePageResponse = await response.json() as CasePageResponse;
             const cases = casePageResponse.content;
             // const { cases } = await response.json() as CasePageResponse; - alternative
-            const result = filterCases(cases, (args as any).input);
+            const result = filterCases(cases, args as any);
             
             return {
                 content: [
@@ -136,7 +152,7 @@ export function registerTools(server: McpServer): void {
             }
         }
         
-    );
+    )
 
     server.tool(
         "shareImage",
@@ -148,11 +164,12 @@ export function registerTools(server: McpServer): void {
         },
 
         async (args) => {
-            const caseId = (args as any).input.caseId;
-            const response = await fetch("https://mano-snucse.healthhub.dev/share-code", {
+            const caseId = (args as any).caseId;
+            const response = await fetch("https://snucse.hscan.kr/api/hscan/share-code", {
                 method: "POST",
                 
                 headers: {
+                    ...authHeaders,
                     "Content-Type": "application/json",
                 }, 
                 body: JSON.stringify({
@@ -160,6 +177,7 @@ export function registerTools(server: McpServer): void {
                 }),
             });
             const result = await response.json();
+            
             const code = result.code; 
 
             return {
@@ -171,7 +189,7 @@ export function registerTools(server: McpServer): void {
                 ]
             }
         }
-    );
+    )
 
     server.tool(
         "IssueCD",
@@ -179,16 +197,23 @@ export function registerTools(server: McpServer): void {
         {
             inputSchema: z.object({
                 caseId: z.string(),
-                address: mailingAddressSchema
+                mailingAddress: z.object({
+                    baseAddress: z.string(),
+                    detailAddress: z.string(),
+                    receiverName: z.string(),
+                    receiverPhone: z.string()
+                }),
+                deliveryFee: z.number()
             })
         },
         async (args) => {
             //const { caseId, address } = args;
-            const { caseId, address } = (args as any).input;
+            const { caseId, address } = args as any;
 
-            const prepareResponse = await fetch("https://mano-snucse.healthhub.dev/cd-delivery/payment", {
+            const prepareResponse = await fetch("https://snucse.hscan.kr/api/hscan/cd-delivery/payment", {
                 method: "POST",
                 headers: {
+                    ...authHeaders,
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ caseId, address }),
@@ -197,43 +222,52 @@ export function registerTools(server: McpServer): void {
             const payment = await prepareResponse.json();
             const paymentId = payment.paymentId; // 결제 준비 응답에서 paymentId 받아오기. API 명세서에 paymentId가 있는지 확실하지 않음. 일단 가정
 
-            const confirmResponse = await fetch(`https://mano-snucse.healthhub.dev/cd-delivery/payment/{id}`, {
-                method: "PUT",
+            const confirmResponse = await fetch(`https://snucse.hscan.kr/api/hscan/hospital/study/payment?page=0&size=5`, {
+                method: "GET",
                 headers: {
+                    ...authHeaders,
                     "Content-Type": "application/json",
                 },
             });
+
+            const result = await confirmResponse.json();
                 
             return {
                 content: [
                     {
                         type: "text",
-                        text: "CD 발급 신청 완료되었습니다."
+                        text: JSON.stringify({
+                            message: "CD 발급 신청 완료되었습니다.",
+                            trackingNumber: result.trackingNumber, 
+                            shippingCompany: result.shippingCompany,
+                            sender: result.sender,
+                            sentAt: result.sentAt,
+                        })
                     }
                 ]
             }
         }
-    );
-
+    )
     
 
     server.tool(
         "searchHospital",
-        "병원 검색",
+        "병원을 검색합니다.",
 
          {
-            //title: "Get Image List",
             inputSchema: z.object({
             name: z.string().optional()            
             }) 
         },
 
         async (args) => {
-            const response = await fetch("https://mano-snucse.healthhub.dev/hospital", {
-                method: "GET"
+            const response = await fetch("https://snucse.hscan.kr/api/hscan/hospital", {
+                method: "GET",
+                headers: authHeaders,
             });
-            const hospitals = await response.json() as Hospital[];
-            const result = filterHospitals(hospitals, (args as any).input);
+            const rawText = await response.text();
+            const hospitals = JSON.parse(rawText) as Hospital[];
+            const result = filterHospitals(hospitals, args as any);
             
             return {
                 content: [
@@ -249,4 +283,10 @@ export function registerTools(server: McpServer): void {
         }
 
     )
+
+    
+
+
+
+
 }
