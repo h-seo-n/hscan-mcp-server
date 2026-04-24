@@ -7,6 +7,7 @@ import type { CasePageResponse } from "../lib/types.ts";
 import type { Case } from "../lib/types.ts";
 import type {  mailingAddress } from "../lib/types.ts";
 import type { Hospital } from "../lib/types.ts";
+import type { Study } from "../lib/types.ts";
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 
 const SESSION = process.env.SESSION ?? "";
@@ -284,8 +285,151 @@ export function registerTools(server: McpServer): void {
 
     )
 
-    
 
+
+    server.tool(
+        "uploadImage",
+        "의료 영상을 업로드합니다.",
+        {
+            inputSchema: z.object({
+                caseId: z.string(),
+            })
+        },
+        async (args) => {
+            const { caseId } = args as any;
+            const response = await fetch("https://snucse.hscan.kr/api/hscan/hospital/{id}/study", {
+                method: "POST",
+                headers: {
+                    ...authHeaders,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ caseId }),
+            });
+            const result = await response.json();
+            
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify({
+                            message: "의료 영상 보내기를 완료했습니다.",
+                        })
+
+                    },
+                ],
+            };
+        }
+    );
+
+    server.tool(
+        "getImageByHospital",
+        "병원 이름으로 해당 병원에서 촬영한 의료 영상 목록을 검색합니다.",
+        {
+            inputSchema: z.object({
+                hospitalName: z.string(),
+            }),
+        },
+        async (args) => {
+
+            const { hospitalName } = (args as any).inputSchema;
+
+            const hospitalListResponse = await fetch("https://snucse.hscan.kr/api/hscan/hospital", {
+                method: "GET",
+                headers: authHeaders,}
+            );
+
+            const params = new URLSearchParams({
+                hospitalName,
+            });
+
+            const hospitalList: Hospital[] = await hospitalListResponse.json();
+            const hospital = hospitalList.find((h: any) => h.name === hospitalName);
+            
+            if (!hospital) {
+                return {
+                    content: [{
+                        type: "text",
+                        text: JSON.stringify({ error: `'${hospitalName}' 병원을 찾을 수 없습니다.` }),
+                    }],
+                };
+            }
+
+            const studyResponse = await fetch(`https://snucse.hscan.kr/api/hscan/hospital/${hospital.id}/study`,
+                {
+                    method : "GET",
+                    headers: { ...authHeaders },
+                    
+                }
+            );
+
+            const result = await studyResponse.json();
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify({
+                            message: `'${hospitalName}' 병원의 영상 검색 결과입니다.`,
+                            result,
+                        }),
+                    },
+                ],
+            };
+        }
+    );
+
+    server.tool(
+        "requestImage",
+        "영상 발급을 신청합니다.",
+        {
+            inputSchema: z.object({
+                caseId: z.string(),
+                downloadFee: z.number(),
+            }),
+        },
+        async (args) => {
+            const { caseId, downloadFee } = args as any;
+
+            const prepareResponse = await fetch(`https://snucse.hscan.kr/api/hscan/cd-delivery/payment`, {
+                method: "POST",
+                headers: {
+                    ...authHeaders,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ caseId }),
+            });
+
+            const payment = await prepareResponse.json();
+            const paymentId = payment.paymentId;
+
+            const confirmResponse = await fetch(
+                `https://snucse.hscan.kr/api/hscan/cd-delivery/confirm`,
+                {
+                    method: "GET",
+                    headers: {
+                        ...authHeaders,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+
+            const result = await confirmResponse.json();
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify({
+                            message: "영상 발급 신청이 완료되었습니다.",
+                        }),
+                    },
+                ],
+            };
+        }
+    );
+
+    
 
 
 
