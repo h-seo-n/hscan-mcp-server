@@ -1,5 +1,3 @@
-import { number } from "zod";
-
 /** tool 사용 내역 데이터타입 */
 export interface ToolCallEntry {
     id: string;
@@ -34,41 +32,6 @@ export interface SessionData {
  * healthhub api 명세서를 보고
  * 병원, 영상, 결과, 유저 정보... 등에 대한 필요한 데이터타입이나 인터페이스를 정의하기
  */
-
-/*export type Case = {
-    caseId: string
-    patientId: string
-    birthDate: string
-    patientName: string
-    patientSex: string
-    studyDate: string
-    accessionNumber: string
-    studyInstanceUID: string
-    studyDescription: string
-    modality: string
-    institutionName: string
-    imageHash : {
-        additionalProp1: string
-        additionalProp2: string
-        additionalProp3: string
-    }
-    bodyPart: [
-        string
-    ]
-    series: [
-        {
-            seriesNumber: string
-            seriesInstanceUID: string
-            seriesDescription: string
-            images: [
-                string
-            ]
-        }
-    ]
-    userId: string
-    
-}*/
-
 type ImageId = string;
 
 interface Series {
@@ -80,9 +43,7 @@ interface Series {
 
 type PatientSex = "M" | "F" | "O";
 
-
-
-interface Case {
+export interface Case {
     caseId: string;
     patientId: string;
     birthDate: string;
@@ -120,7 +81,7 @@ interface Pageable {
     unpaged: boolean;
 }
 
-interface CasePageResponse {
+export interface CasePageResponse {
     content: Case[];
     pageable: Pageable;
     sort: SortInfo;
@@ -133,6 +94,7 @@ interface CasePageResponse {
     numberOfElements: number;
     empty: boolean;
 }
+
 interface PriceBase {
     type: "SIMPLE" | "VOLUME2";
 }
@@ -172,30 +134,25 @@ interface Volume2Price extends PriceBase {
 export type HospitalPrice = SimplePrice | Volume2Price;
 
 export type Hospital = {
-    id: string
-    name: string
-    address: string | null
-    registrationNumberRequired: boolean
-    disabed: boolean
+    id: string;
+    name: string;
+    address: string | null;
+    registrationNumberRequired: boolean;
+    disabed: boolean;
     price: HospitalPrice
-    useMailing: true
-    mailingMandatory: true
-    loadEnabled: true
-    storeEnabled: true
-    health: {
-        code: string
-        description: string
-    }
-    onlineIssuanceMessage: string
-    hpacsHospitalId: [
-        string
-    ]
+    useMailing: boolean;
+    mailingMandatory: boolean;
+    loadEnabled: boolean;
+    storeEnabled: boolean;
+    health: unknown | null;
+    onlineIssuanceMessage: string | null;
+    hpacsHospitalId: string[];
 }
 
 export type mailingAddress = {
-    postalCode: string
-    baseAddress: string
-    detailAddress: string
-    receiverName: string
-    receiverPhone: string
+    postalCode: string;
+    baseAddress: string;
+    detailAddress: string;
+    receiverName: string;
+    receiverPhone: string;
 }

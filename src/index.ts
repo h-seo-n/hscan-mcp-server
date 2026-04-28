@@ -192,9 +192,9 @@ app.listen(PORT, HOST, () => {
 ╔═════════════════════════════════════════════════════╗
 ║  HScan MCP Server                                   ║
 ║  ──────────────────────────────────────────────     ║
-║  MCP endpoint : http://${HOST}:${PORT}/mcp          ║
-║  Health check : http://${HOST}:${PORT}/health       ║
-║  Debug API    : http://${HOST}:${PORT}/api/sessions ║
+║  MCP endpoint : http://${HOST}:${PORT}/mcp           ║
+║  Health check : http://${HOST}:${PORT}/health        ║
+║  Debug API    : http://${HOST}:${PORT}/api/sessions  ║
 ╚═════════════════════════════════════════════════════╝
         `);
 });
