@@ -183,4 +183,101 @@ export function registerTools(server: McpServer): void {
                 };
             }),
     );
+
+
+    server.registerTool(
+        "uploadImage",
+        {
+            description: "의료 영상을 업로드합니다.",
+            inputSchema: {
+                hospitalId: z.string(),
+                caseId: z.string(),
+            },
+        },
+        async (args, extra) =>
+            withLogging("uploadImage", args, async () => {
+                await api.uploadStudy(args.hospitalId, args.caseId, getAuthToken(extra));
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                message: "의료 영상 보내기를 완료했습니다.",
+                            }),
+                        },
+                    ],
+                };
+            }),
+    );
+
+    server.registerTool(
+        "getImageByHospital",
+        {
+            description: "병원 이름으로 해당 병원에서 촬영한 의료 영상 목록을 검색합니다.",
+            inputSchema: {
+                hospitalName: z.string(),
+            },
+        },
+        async (args, extra) =>
+            withLogging("getImageByHospital", args, async () => {
+                const authToken = getAuthToken(extra);
+                const hospitals = await api.getHospitals(authToken);
+                const hospital = hospitals.find((h) => h.name === args.hospitalName);
+
+                if (!hospital) {
+                    return {
+                        content: [
+                            {
+                                type: "text",
+                                text: JSON.stringify({
+                                    error: `'${args.hospitalName}' 병원을 찾을 수 없습니다.`,
+                                }),
+                            },
+                        ],
+                    };
+                }
+
+                const result = await api.getStudiesByHospital(hospital.id, authToken);
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                message: `'${args.hospitalName}' 병원의 영상 검색 결과입니다.`,
+                                result,
+                            }),
+                        },
+                    ],
+                };
+            }),
+    );
+
+    server.registerTool(
+        "requestImage",
+        {
+            description: "영상 발급을 신청합니다.",
+            inputSchema: {
+                caseId: z.string(),
+                downloadFee: z.number(),
+            },
+        },
+        async (args, extra) =>
+            withLogging("requestImage", args, async () => {
+                await api.requestImageIssuance({
+                    caseId: args.caseId,
+                    downloadFee: args.downloadFee,
+                    authToken: getAuthToken(extra),
+                });
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                message: "영상 발급 신청이 완료되었습니다.",
+                            }),
+                        },
+                    ],
+                };
+            }),
+    );
 }

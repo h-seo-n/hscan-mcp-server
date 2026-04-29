@@ -107,3 +107,35 @@ export async function requestCdDelivery(args: {
         authToken: args.authToken
     });
 }
+
+export async function uploadStudy(
+    hospitalId: string,
+    caseId: string,
+    authToken?: string,
+): Promise<unknown> {
+    return callApi(`hospital/${hospitalId}/study`, {
+        method: "POST",
+        body: { caseId },
+        authToken,
+    });
+}
+
+export async function getStudiesByHospital(
+    hospitalId: string,
+    authToken?: string,
+): Promise<unknown> {
+    return callApi(`hospital/${hospitalId}/study`, { authToken });
+}
+
+export async function requestImageIssuance(args: {
+    caseId: string;
+    downloadFee: number;
+    authToken?: string;
+}): Promise<unknown> {
+    await callApi("cd-delivery/payment", {
+        method: "POST",
+        body: { caseId: args.caseId, downloadFee: args.downloadFee },
+        authToken: args.authToken,
+    });
+    return callApi("cd-delivery/confirm", { authToken: args.authToken });
+}
