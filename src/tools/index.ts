@@ -1,7 +1,10 @@
 import "dotenv/config";
-import { z } from "zod";
+import { date, z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import * as api from "../lib/healthHubApi.js";
+import * as fs from "fs";
+import * as path from "path";
+import {downloadImage} from "../lib/healthHubApi.js";
 import type { Case, Hospital } from "../lib/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol";
 
@@ -147,10 +150,6 @@ export function registerTools(server: McpServer): void {
                             type: "text",
                             text: JSON.stringify({
                                 message: "CD 발급 신청 완료되었습니다.",
-                                trackingNumber: result.trackingNumber,
-                                shippingCompany: result.shippingCompany,
-                                sender: result.sender,
-                                sentAt: result.sentAt,
                             }),
                         },
                     ],
@@ -257,15 +256,15 @@ export function registerTools(server: McpServer): void {
         {
             description: "영상 발급을 신청합니다.",
             inputSchema: {
-                caseId: z.string(),
-                downloadFee: z.number(),
+                hospitalId: z.string(),
+                studyInstanceUID: z.string(),
             },
         },
         async (args, extra) =>
             withLogging("requestImage", args, async () => {
                 await api.requestImageIssuance({
-                    caseId: args.caseId,
-                    downloadFee: args.downloadFee,
+                    hospitalId: args.hospitalId,
+                    studyInstanceUID: args.studyInstanceUID,
                     authToken: getAuthToken(extra),
                 });
                 return {
@@ -280,4 +279,46 @@ export function registerTools(server: McpServer): void {
                 };
             }),
     );
+
+
+    server.registerTool(
+        "downloadImage",
+        {
+            description: "영상을 다운로드합니다. jpeg 또는 dicom 형식을 선택할 수 있습니다.",
+            inputSchema: {
+                ids: z.array(z.string()),
+                fileType: z.enum(["jpeg", "dicom"]),
+                outputPath: z.string().optional(),
+            },
+        },
+        async (args, extra) =>
+            withLogging("downloadImage", args, async () => {
+                const zipBuffer = await downloadImage({
+                    ids: args.ids,
+                    fileType: args.fileType,
+                    authToken: getAuthToken(extra),
+                });
+
+                const fileName = `images_${Date.now()}.zip`;
+                const savePath = path.join(args.outputPath ?? process.cwd(), fileName);
+
+                await fs.promises.writeFile(savePath, zipBuffer);
+
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify({
+                                message: "영상 다운로드가 완료되었습니다.",
+                                fileType: args.fileType,
+                                savedPath: savePath,
+                                fileName,
+                            }),
+                        },
+                    ],
+                };
+            }),
+    );
+
+    
 }
