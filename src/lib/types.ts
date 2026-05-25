@@ -123,7 +123,7 @@ interface ModalityConfig {
     virtualSize: number;
 }
 
-interface Volume2Price extends PriceBase {
+export interface Volume2Price extends PriceBase {
     type: "VOLUME2";
     units: VolumeUnit[];
     modalities: Partial<Record<ModalityKey, ModalityConfig>>;
