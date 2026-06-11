@@ -4,6 +4,8 @@ import type { Case, CasePageResponse, Hospital, mailingAddress, Volume2Price, Mo
 const BASE_URL = process.env.HEALTHHUB_API_URL ?? "https://mano-snucse.healthhub.dev/";
 // const BASE_URL = "https://api.healthhub.example.com"
 const API_TIMEOUT_MS = 10_000;
+// 영상(jpeg/dicom) 다운로드는 용량이 커서 일반 API보다 훨씬 오래 걸릴 수 있음
+const DOWNLOAD_TIMEOUT_MS = 120_000;
 
 async function callApi<T>(
     endpoint: string,
@@ -241,9 +243,10 @@ async function callApiRaw(
     options?: {
         params?: Record<string, string | string[]>;
         authToken?: string;
+        timeoutMs?: number;
     },
 ): Promise<Buffer> {
-    const { params, authToken } = options ?? {};
+    const { params, authToken, timeoutMs = API_TIMEOUT_MS } = options ?? {};
     const url = new URL(`${BASE_URL}${endpoint}`);
 
     if (params) {
@@ -257,7 +260,7 @@ async function callApiRaw(
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
         const response = await fetch(url.toString(), {
@@ -275,7 +278,7 @@ async function callApiRaw(
         return Buffer.from(await response.arrayBuffer());
     } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
-            throw new Error(`Healthhub API timeout (${API_TIMEOUT_MS}ms) for ${endpoint}`);
+            throw new Error(`Healthhub API timeout (${timeoutMs}ms) for ${endpoint}`);
         }
         throw error;
     } finally {
@@ -292,5 +295,6 @@ export async function downloadImage(args: {
     return callApiRaw(`case/${args.fileType}/sse/${key}`, {
         params: { ids: args.ids },
         authToken: args.authToken,
+        timeoutMs: DOWNLOAD_TIMEOUT_MS,
     });
 }

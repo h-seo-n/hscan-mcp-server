@@ -6,6 +6,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { registerTools } from "./tools/index.js";
 import * as store from "./lib/sessionStore.js";
+import * as downloads from "./lib/downloadStore.js";
 
 
 /* ---- SERVER CONFIG ---- */
@@ -142,6 +143,28 @@ app.delete("/mcp", async (req, res) => {
     } else {
         res.status(404).json({ error: "Session not found" });
     }
+});
+
+
+/* ------ 영상 다운로드 endpoint ------ */
+// downloadImage 툴이 staging한 파일을 브라우저가 받아간다. Content-Disposition: attachment 로
+// 브라우저 네이티브 다운로드를 트리거한다. 토큰은 일회성이며 전송 후 폐기된다.
+app.get("/download/:token", (req, res) => {
+    const item = downloads.getDownload(req.params.token);
+    if (!item) {
+        res.status(404).json({ error: "Download not found or expired" });
+        return;
+    }
+
+    res.setHeader("Content-Type", item.contentType);
+    res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${encodeURIComponent(item.fileName)}"`,
+    );
+    res.setHeader("Content-Length", item.buffer.length.toString());
+    res.send(item.buffer);
+
+    downloads.deleteDownload(req.params.token);
 });
 
 

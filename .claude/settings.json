@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PATH=/Users/seoyeonheo/.nvm/versions/node/v20.19.5/bin:__TRACKED_VAR__ node_modules/.bin/tsc --noEmit)",
+      "Bash(echo \"exit: $?\")"
+    ]
+  }
+}
