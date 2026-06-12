@@ -188,7 +188,7 @@ export function registerTools(server: McpServer): void {
     server.registerTool(
         "searchHospital",
         {
-            description: "병원을 검색합니다.",
+            description: "무슨 병원에서 영상을 가져올 수 있는지, 제휴 병원을 검색합니다.",
             inputSchema: {
                 name: z.string().optional(),
             },
