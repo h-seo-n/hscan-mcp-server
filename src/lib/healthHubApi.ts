@@ -130,10 +130,10 @@ interface CdDeliveryPaymentResponse {
 
 export async function requestCdDelivery(args: {
     caseIds: string[];
-    mailingAddress: Partial<mailingAddress>;
+    mailingAddress: mailingAddress;
     deliveryFee: number;
     authToken?: string;
-}): Promise<void> {
+}): Promise<CdDeliveryPaymentResponse> {
     const payment = await callApi<CdDeliveryPaymentResponse>("cd-delivery/payment", {
         method: "POST",
         body: {
@@ -144,11 +144,12 @@ export async function requestCdDelivery(args: {
         authToken: args.authToken
     });
 
-    await callApi(`cd-delivery/payment/${payment.id}`, {
-        method: "PUT",
-        body: {},
-        authToken: args.authToken
-    });
+    return payment;
+    // await callApi(`cd-delivery/payment/${payment.id}`, {
+    //     method: "PUT",
+    //     body: {},
+    //     authToken: args.authToken
+    // });
 }
 
 export async function uploadStudy(
@@ -194,7 +195,7 @@ export async function requestImageIssuance(args: {
     hospitalId: string;
     studyInstanceUID: string;
     authToken?: string;
-}): Promise<void> {
+}): Promise<StudyPaymentResponse> {
     const [studies, hospitals] = await Promise.all([
         getStudiesByHospital(args.hospitalId, args.authToken),
         getHospitals(args.authToken)
@@ -222,11 +223,13 @@ export async function requestImageIssuance(args: {
         authToken: args.authToken,
     });
 
-    await callApi(`hospital/study/payment/${payment.id}`, {
-        method: "PUT",
-        body: {},
-        authToken: args.authToken,  
-    });
+    return payment;
+
+    // await callApi(`hospital/study/payment/${payment.id}`, {
+    //     method: "PUT",
+    //     body: {},
+    //     authToken: args.authToken,  
+    // });
 }
 
 

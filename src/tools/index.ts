@@ -156,10 +156,11 @@ export function registerTools(server: McpServer): void {
             inputSchema: {
                 caseIds: z.string().array(),
                 mailingAddress: z.object({
-                    baseAddress: z.string(),
+                    postalCode: z.string().min(1),
+                    baseAddress: z.string().min(1),
                     detailAddress: z.string(),
-                    receiverName: z.string(),
-                    receiverPhone: z.string(),
+                    receiverName: z.string().min(1),
+                    receiverPhone: z.string().min(1),
                 }),
                 deliveryFee: z.number(),
             },
@@ -177,7 +178,9 @@ export function registerTools(server: McpServer): void {
                         {
                             type: "text",
                             text: JSON.stringify({
-                                message: "CD 발급 신청 완료되었습니다.",
+                                message: "CD 발급을 위한 결제 id를 반환했습니다. 클라이언트 웹에서 결제를 마저 진행해주세요.",
+                                paymentId: result.id,
+                                paymentStatus: result.paymentStatus,
                             }),
                         },
                     ],
@@ -300,7 +303,7 @@ export function registerTools(server: McpServer): void {
                         {
                             type: "text",
                             text: JSON.stringify({
-                                message: "영상 발급 신청이 완료되었습니다.",
+                                message: "결제 id를 반환했습니다. 클라이언트 웹에서 결제를 마저 진행해주세요.",
                             }),
                         },
                     ],
