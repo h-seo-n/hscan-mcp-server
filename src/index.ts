@@ -7,12 +7,11 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { registerTools } from "./tools/index.js";
 import * as store from "./lib/sessionStore.js";
 import * as downloads from "./lib/downloadStore.js";
+import { HOST, PORT } from "./lib/config.js";
+import llmProxyRouter from "./routes/llmProxy.js";
 
 
 /* ---- SERVER CONFIG ---- */
-const PORT = parseInt(process.env.PORT ?? "3000", 10);
-const HOST = process.env.HOST ?? "127.0.0.1";
-
 // 배포 가정 x 상태에서 localhost의 클라이언트가 서버에 접속할 수 있도록
 const ALLOWED_ORIGINS = [
   "http://localhost:5173", 
@@ -37,7 +36,8 @@ app.use(
     }),
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+app.use("/api/llm", llmProxyRouter);
 
 
 /* ---------- MCP server instance per session --------- */
